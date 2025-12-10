@@ -336,7 +336,6 @@ If you encounter any issues or have questions:
 - [ ] Batch conversion support
 - [ ] Additional image formats (TIFF, GIF, etc.)
 - [ ] Image optimization suggestions
-- [ ] Preview before download
 - [ ] Conversion history
 - [ ] API endpoint for programmatic access
 
