@@ -41,6 +41,7 @@ if (Test-Path $dllSource) {
     } catch {
         Write-Host "✗ Copy failed: $_" -ForegroundColor Red
         exit 1
+    }
 } else {
     Write-Host "✗ libwebp.dll not found in extracted files" -ForegroundColor Red
     exit 1

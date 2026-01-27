@@ -2,13 +2,24 @@ import io
 import ctypes
 import os
 import sys
-from ctypes import c_uint8, c_int, c_float, c_size_t, POINTER, Structure
+import subprocess
+import tempfile
+from ctypes import c_uint8, c_int, c_float, c_size_t, c_uint32, POINTER, Structure
 from ctypes.util import find_library
 from PIL import Image
 import numpy as np
 
+# Try importing pillow-avif-plugin for AVIF support
+try:
+    import pillow_avif
+    _avif_plugin_available = True
+except ImportError:
+    _avif_plugin_available = False
+
 # Store diagnostic information
 _libwebp_load_errors = []
+_libavif_load_errors = []
+_compression_tools = {}
 
 def _try_load_libwebp(path):
     """Try to load libwebp from a specific path."""
@@ -143,6 +154,86 @@ if libwebp:
     libwebp.WebPGetInfo.restype = c_int
 
 
+# Try to load libavif library for AVIF support
+libavif = None
+
+try:
+    # Try using find_library
+    found_lib = find_library('avif')
+    if found_lib:
+        libavif = _try_load_libwebp(found_lib)
+        if libavif:
+            _libavif_load_errors.append(f"✅ Successfully loaded: {found_lib}")
+    
+    # Try 'libavif' name
+    if not libavif:
+        found_lib = find_library('libavif')
+        if found_lib:
+            libavif = _try_load_libwebp(found_lib)
+            if libavif:
+                _libavif_load_errors.append(f"✅ Successfully loaded: {found_lib}")
+    
+    # Manual paths if find_library didn't work
+    if not libavif:
+        if hasattr(ctypes, 'windll'):
+            # Windows
+            search_paths = [
+                'libavif.dll',
+                'avif.dll',
+                os.path.join(os.path.dirname(__file__), 'libavif.dll'),
+                os.path.join(os.path.dirname(__file__), 'avif.dll'),
+                'C:\\Windows\\System32\\libavif.dll',
+            ]
+            
+            for path in search_paths:
+                try:
+                    libavif = ctypes.CDLL(path)
+                    _libavif_load_errors.append(f"✅ Successfully loaded: {path}")
+                    break
+                except:
+                    _libavif_load_errors.append(f"❌ Failed to load {path}")
+        else:
+            # Linux/Mac
+            search_paths = [
+                'libavif.so',
+                'libavif.so.15',
+                'libavif.so.16',
+                'libavif.dylib',
+                os.path.join(os.path.dirname(__file__), 'libavif.so'),
+                '/usr/lib/libavif.so',
+                '/usr/local/lib/libavif.so',
+                '/opt/homebrew/lib/libavif.dylib',
+            ]
+            
+            for path in search_paths:
+                try:
+                    libavif = ctypes.CDLL(path)
+                    _libavif_load_errors.append(f"✅ Successfully loaded: {path}")
+                    break
+                except:
+                    _libavif_load_errors.append(f"❌ Failed to load {path}")
+except Exception as e:
+    _libavif_load_errors.append(f"❌ Unexpected error: {e}")
+    libavif = None
+
+
+# Detect compression tools
+def _check_tool_available(tool_name):
+    """Check if a compression tool is available in PATH."""
+    try:
+        result = subprocess.run([tool_name, '--version'], 
+                              capture_output=True, 
+                              timeout=5)
+        return result.returncode == 0
+    except:
+        return False
+
+# Check for compression tools
+_compression_tools['mozjpeg'] = _check_tool_available('cjpeg') or _check_tool_available('mozjpeg')
+_compression_tools['oxipng'] = _check_tool_available('oxipng')
+_compression_tools['optipng'] = _check_tool_available('optipng')
+
+
 def is_libwebp_available():
     """Check if libwebp library is available."""
     return libwebp is not None
@@ -151,6 +242,115 @@ def is_libwebp_available():
 def get_libwebp_diagnostics():
     """Get diagnostic information about libwebp loading attempts."""
     return _libwebp_load_errors.copy()
+
+
+def is_libavif_available():
+    """Check if libavif library is available."""
+    return libavif is not None or _avif_plugin_available
+
+
+def get_libavif_diagnostics():
+    """Get diagnostic information about libavif loading attempts."""
+    diag = _libavif_load_errors.copy()
+    if _avif_plugin_available:
+        diag.append("✅ pillow-avif-plugin is available")
+    return diag
+
+
+def get_compression_tools():
+    """Get dictionary of available compression tools."""
+    return _compression_tools.copy()
+
+
+def optimize_png(png_data, tool='auto'):
+    """
+    Optimize PNG using OxiPNG or OptiPNG.
+    
+    Args:
+        png_data: bytes of PNG data
+        tool: 'oxipng', 'optipng', or 'auto' (picks best available)
+    
+    Returns:
+        bytes: optimized PNG data
+    """
+    if tool == 'auto':
+        tool = 'oxipng' if _compression_tools.get('oxipng') else 'optipng'
+    
+    if not _compression_tools.get(tool):
+        return png_data  # Return original if tool not available
+    
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp_in:
+            tmp_in.write(png_data)
+            tmp_in_path = tmp_in.name
+        
+        if tool == 'oxipng':
+            subprocess.run([tool, '--opt', 'max', '--strip', 'safe', tmp_in_path],
+                         check=True, capture_output=True)
+        elif tool == 'optipng':
+            subprocess.run([tool, '-o7', '-strip', 'all', tmp_in_path],
+                         check=True, capture_output=True)
+        
+        with open(tmp_in_path, 'rb') as f:
+            optimized_data = f.read()
+        
+        os.unlink(tmp_in_path)
+        return optimized_data
+    except Exception as e:
+        if 'tmp_in_path' in locals():
+            try:
+                os.unlink(tmp_in_path)
+            except:
+                pass
+        return png_data  # Return original on error
+
+
+def optimize_jpeg_mozjpeg(rgb_data, width, height, quality=80):
+    """
+    Optimize JPEG using MozJPEG.
+    
+    Args:
+        rgb_data: bytes of RGB data
+        width: image width
+        height: image height
+        quality: quality factor (0-100)
+    
+    Returns:
+        bytes: optimized JPEG data
+    """
+    if not _compression_tools.get('mozjpeg'):
+        return None  # Indicate MozJPEG not available
+    
+    try:
+        # Create temporary PPM file (MozJPEG input)
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.ppm', mode='wb') as tmp_in:
+            # Write PPM header
+            header = f'P6\n{width} {height}\n255\n'.encode('ascii')
+            tmp_in.write(header)
+            tmp_in.write(rgb_data)
+            tmp_in_path = tmp_in.name
+        
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as tmp_out:
+            tmp_out_path = tmp_out.name
+        
+        # Run cjpeg (MozJPEG)
+        cmd = ['cjpeg', '-quality', str(quality), '-outfile', tmp_out_path, tmp_in_path]
+        subprocess.run(cmd, check=True, capture_output=True)
+        
+        with open(tmp_out_path, 'rb') as f:
+            optimized_data = f.read()
+        
+        os.unlink(tmp_in_path)
+        os.unlink(tmp_out_path)
+        return optimized_data
+    except Exception as e:
+        for path in [locals().get('tmp_in_path'), locals().get('tmp_out_path')]:
+            if path:
+                try:
+                    os.unlink(path)
+                except:
+                    pass
+        return None
 
 
 def encode_to_webp(rgba_data, width, height, quality_factor=80.0, lossless=False):
@@ -245,15 +445,16 @@ def decode_from_webp(webp_data):
     return rgba_data, width_val, height_val
 
 
-def convert_img_format(image_file, output_format, quality=80, lossless=False):
+def convert_img_format(image_file, output_format, quality=80, lossless=False, optimize=False):
     """
-    Convert image format using libwebp API for WebP operations.
+    Convert image format with support for AVIF, WebP, and optimization.
     
     Args:
         image_file: file-like object or bytes
-        output_format: target format (webp, png, jpeg, jpg, jfif, bmp)
+        output_format: target format (avif, webp, png, jpeg, jpg, jfif, bmp)
         quality: quality factor for lossy formats (0-100)
-        lossless: if True, use lossless WebP encoding
+        lossless: if True, use lossless encoding for WebP/AVIF
+        optimize: if True, use compression tools (MozJPEG, OxiPNG, etc.)
     
     Returns:
         BytesIO: converted image data
@@ -291,6 +492,21 @@ def convert_img_format(image_file, output_format, quality=80, lossless=False):
     
     width, height = img.size
     rgba_data = img.tobytes()
+    
+    # Handle AVIF output
+    if output_format_lower == 'avif':
+        output_img = io.BytesIO()
+        try:
+            # Try using pillow-avif-plugin or Pillow's built-in AVIF support
+            save_kwargs = {'format': 'AVIF', 'quality': quality}
+            if lossless:
+                save_kwargs['quality'] = 100
+                save_kwargs['lossless'] = True
+            img.save(output_img, **save_kwargs)
+            output_img.seek(0)
+            return output_img
+        except Exception as e:
+            raise RuntimeError(f"AVIF encoding failed. Make sure pillow-avif-plugin is installed: {e}")
     
     # Handle WebP output using libwebp API
     if output_format_lower == 'webp':
@@ -341,10 +557,23 @@ def convert_img_format(image_file, output_format, quality=80, lossless=False):
             rgb_img = Image.new('RGB', img.size, (255, 255, 255))
             rgb_img.paste(img, mask=img.split()[3])  # Use alpha channel as mask
             img = rgb_img
+        
+        # Try MozJPEG optimization if requested and available
+        if optimize:
+            rgb_data = img.tobytes()
+            optimized = optimize_jpeg_mozjpeg(rgb_data, img.size[0], img.size[1], quality)
+            if optimized:
+                output_img.write(optimized)
+                output_img.seek(0)
+                return output_img
+        
+        # Fallback to standard Pillow JPEG
         save_kwargs['quality'] = quality
         save_kwargs['format'] = 'JPEG'
+        save_kwargs['optimize'] = True  # Enable Pillow's optimize
     elif output_format_lower == 'png':
         save_kwargs['format'] = 'PNG'
+        save_kwargs['optimize'] = True  # Enable Pillow's optimize
     elif output_format_lower == 'bmp':
         if img.mode == 'RGBA':
             img = img.convert('RGB')
@@ -352,4 +581,12 @@ def convert_img_format(image_file, output_format, quality=80, lossless=False):
     
     img.save(output_img, **save_kwargs)
     output_img.seek(0)
+    
+    # Apply PNG optimization tools if requested
+    if output_format_lower == 'png' and optimize:
+        png_data = output_img.getvalue()
+        optimized_data = optimize_png(png_data)
+        output_img = io.BytesIO(optimized_data)
+        output_img.seek(0)
+    
     return output_img

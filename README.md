@@ -10,9 +10,14 @@ A modern, web-based image converter built with Streamlit that uses the **libwebp
 
 - 🔌 **Direct libwebp API Integration**: Uses Python's `ctypes` to call libwebp C functions directly
 - 🎨 **WebP Support**: Full support for WebP encoding (lossy and lossless) and decoding
-- 📸 **Multiple Formats**: Supports PNG, JPEG, JFIF, BMP, and WebP
+- 🧪 **AVIF Support**: Advanced, high-efficiency AVIF image encoding via Pillow/`pillow-avif-plugin`
+- 📸 **Multiple Formats**: Supports PNG, JPEG, JFIF, BMP, WebP, and AVIF
 - ⚙️ **Quality Control**: Adjustable quality settings (0-100) for lossy formats
-- 🎯 **Lossless Option**: Option for lossless WebP encoding
+- 🎯 **Lossless Option**: Option for lossless WebP and AVIF encoding
+- 🛠️ **Advanced Compression Tools**:
+  - **MozJPEG**: For optimizing JPEG files when `cjpeg`/MozJPEG is available
+  - **OxiPNG/OptiPNG**: For lossless PNG optimization when installed
+  - **WebP (and future WebP v2)**: For modern, efficient lossy and lossless compression via libwebp/Pillow
 - 🔄 **Automatic Fallback**: Falls back to Pillow's WebP support if libwebp is unavailable
 - 🖥️ **Cross-Platform**: Works on Windows, Linux, and macOS
 - 🎨 **Modern UI**: Clean, intuitive Streamlit interface
@@ -52,6 +57,7 @@ This will install:
 - `streamlit` (>=1.28.0) - Web interface
 - `Pillow` (>=10.0.0) - Image processing
 - `numpy` (>=1.24.0) - Array handling
+- `pillow-avif-plugin` (>=1.4.6) - AVIF encoding/decoding support
 
 ### Step 3: Install libwebp Library
 
@@ -113,6 +119,16 @@ brew install webp
 # Using MacPorts
 sudo port install libwebp
 ```
+
+### Optional: Install External Optimization Tools
+
+To enable advanced compression for JPEG and PNG, install:
+
+- **MozJPEG** (`cjpeg` binary on PATH) – used for high-quality JPEG optimization
+- **OxiPNG** (`oxipng` on PATH) – preferred PNG optimizer when available
+- **OptiPNG** (`optipng` on PATH) – fallback PNG optimizer
+
+If these tools are not installed, the app will still work and fall back to Pillow’s built-in optimizations.
 
 ### Step 4: Verify Installation
 
@@ -183,9 +199,10 @@ The `imgconvrtr.py` module uses Python's `ctypes` library to directly call libwe
 
 | Format | Input | Output | Method |
 |--------|-------|--------|--------|
+| AVIF   | ✅    | ✅     | Pillow + `pillow-avif-plugin` |
 | WebP   | ✅    | ✅     | libwebp API (with Pillow fallback) |
-| PNG    | ✅    | ✅     | Pillow |
-| JPEG   | ✅    | ✅     | Pillow |
+| PNG    | ✅    | ✅     | Pillow (+ OxiPNG/OptiPNG when available) |
+| JPEG   | ✅    | ✅     | Pillow (+ MozJPEG when available) |
 | JFIF   | ✅    | ✅     | Pillow |
 | BMP    | ✅    | ✅     | Pillow |
 

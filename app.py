@@ -4,25 +4,54 @@ from imgconvrtr import convert_img_format
 
 # App Title
 st.title("Image Converter")
-st.markdown("**Powered by libwebp API**")
+st.markdown("**Powered by libwebp API, AVIF, and advanced optimizers**")
 
-# Check libwebp availability
-from imgconvrtr import is_libwebp_available, get_libwebp_diagnostics
+# Check library and tool availability
+from imgconvrtr import (is_libwebp_available, get_libwebp_diagnostics,
+                        is_libavif_available, get_libavif_diagnostics,
+                        get_compression_tools)
 
 libwebp_available = is_libwebp_available()
-libwebp_status = "✅ Available" if libwebp_available else "⚠️ Not found (using Pillow fallback)"
-st.caption(f"libwebp status: {libwebp_status}")
+libavif_available = is_libavif_available()
+compression_tools = get_compression_tools()
 
-# Show diagnostics if libwebp is not available
-if not libwebp_available:
-    with st.expander("🔍 libwebp Diagnostic Information"):
-        st.write("**Why libwebp is not found:**")
-        diagnostics = get_libwebp_diagnostics()
-        if diagnostics:
-            for msg in diagnostics:
-                st.text(msg)
-        else:
-            st.text("No diagnostic information available.")
+libwebp_status = "✅ Available" if libwebp_available else "⚠️ Not found (using Pillow fallback)"
+libavif_status = "✅ Available" if libavif_available else "⚠️ Not found"
+
+st.caption(f"libwebp status: {libwebp_status} | libavif status: {libavif_status}")
+
+# Show compression tools status
+tools_status = []
+if compression_tools.get('mozjpeg'):
+    tools_status.append("MozJPEG ✅")
+if compression_tools.get('oxipng'):
+    tools_status.append("OxiPNG ✅")
+if compression_tools.get('optipng'):
+    tools_status.append("OptiPNG ✅")
+
+if tools_status:
+    st.caption(f"Compression tools: {', '.join(tools_status)}")
+
+# Show diagnostics if libraries are not available
+if not libwebp_available or not libavif_available:
+    with st.expander("🔍 Library Diagnostic Information"):
+        if not libwebp_available:
+            st.write("**Why libwebp is not found:**")
+            diagnostics = get_libwebp_diagnostics()
+            if diagnostics:
+                for msg in diagnostics:
+                    st.text(msg)
+            else:
+                st.text("No diagnostic information available.")
+        
+        if not libavif_available:
+            st.write("**Why libavif is not found:**")
+            diagnostics = get_libavif_diagnostics()
+            if diagnostics:
+                for msg in diagnostics:
+                    st.text(msg)
+            else:
+                st.text("No diagnostic information available.")
         
         st.markdown("---")
         st.write("**How to fix:**")
@@ -45,7 +74,10 @@ if not libwebp_available:
            - Extract the ZIP file
            - Copy `libwebp.dll` from the `bin` folder to the same folder as `app.py`
         
-        2. **Restart the Streamlit app** after copying the DLL file
+        2. **Install AVIF support:**
+           - Run: `pip install pillow-avif-plugin`
+        
+        3. **Restart the Streamlit app** after copying the DLL file
         """)
         
         st.markdown("""
@@ -58,27 +90,27 @@ if not libwebp_available:
         
         st.info("💡 **Tip:** Use Option 1 (automatic setup) for the easiest installation!")
 
-# File Uploader - Support more formats including WebP
+# File Uploader - Support more formats including WebP and AVIF
 uploaded_file = st.file_uploader(
     "Upload an Image", 
-    type=["png", "jpg", "jpeg", "jfif", "bmp", "webp"]
+    type=["png", "jpg", "jpeg", "jfif", "bmp", "webp", "avif"]
 )
 
 if uploaded_file is not None:
     # Display the uploaded image
     img = Image.open(uploaded_file)
-    st.image(img, caption="Uploaded Image", use_container_width=True)
+    st.image(img, caption="Uploaded Image", width="stretch")
     st.write(f"**Original format:** {img.format}")
     st.write(f"**Image dimensions:** {img.size[0]} x {img.size[1]} pixels")
     
-    # Format selection dropdown - Include WebP
+    # Format selection dropdown - Include WebP and AVIF
     output_format = st.selectbox(
         "Choose the output format", 
-        ["WebP", "PNG", "JPEG", "JFIF", "BMP"]
+        ["AVIF", "WebP", "PNG", "JPEG", "JFIF", "BMP"]
     )
     
-    # Quality and lossless options (especially for WebP)
-    col1, col2 = st.columns(2)
+    # Quality, lossless, and optimization options
+    col1, col2, col3 = st.columns(3)
     
     with col1:
         quality = st.slider(
@@ -91,24 +123,57 @@ if uploaded_file is not None:
     
     with col2:
         lossless = False
-        if output_format.lower() == "webp":
+        if output_format.lower() in ["webp", "avif"]:
             lossless = st.checkbox(
                 "Lossless encoding", 
                 value=False,
-                help="Lossless WebP encoding (no quality loss, larger file size)"
+                help=f"Lossless {output_format} encoding (no quality loss, larger file size)"
+            )
+    
+    with col3:
+        optimize = False
+        if output_format.lower() in ["png", "jpeg", "jpg", "jfif"]:
+            optimize = st.checkbox(
+                "Advanced optimization",
+                value=False,
+                help="Use MozJPEG for JPEG or OxiPNG/OptiPNG for PNG (if available)"
             )
     
     # Convert and download the image
     if st.button("Convert 📸"):
         with st.spinner("Converting image..."):
             try:
+                # Calculate original file size
+                original_bytes = uploaded_file.getvalue()
+                original_size = len(original_bytes) if original_bytes else 0
+
                 converted_img = convert_img_format(
-                    uploaded_file, 
-                    output_format.lower(), 
+                    uploaded_file,
+                    output_format.lower(),
                     quality=quality,
-                    lossless=lossless
+                    lossless=lossless,
+                    optimize=optimize,
                 )
                 
+                # Calculate converted file size
+                converted_bytes = converted_img.getvalue()
+                converted_size = len(converted_bytes)
+
+                # Compute size change and percentage
+                size_diff = converted_size - original_size
+                if original_size > 0:
+                    percent_change = (size_diff / original_size) * 100
+                else:
+                    percent_change = 0.0
+
+                def _format_size(num_bytes: int) -> str:
+                    """Format bytes into a human-readable string."""
+                    for unit in ["B", "KB", "MB", "GB"]:
+                        if num_bytes < 1024.0 or unit == "GB":
+                            return f"{num_bytes:.1f} {unit}"
+                        num_bytes /= 1024.0
+                    return f"{num_bytes:.1f} GB"
+
                 # Determine MIME type
                 mime_types = {
                     "webp": "image/webp",
@@ -116,12 +181,19 @@ if uploaded_file is not None:
                     "jpeg": "image/jpeg",
                     "jpg": "image/jpeg",
                     "jfif": "image/jpeg",
-                    "bmp": "image/bmp"
+                    "bmp": "image/bmp",
+                    "avif": "image/avif",
                 }
                 
                 mime_type = mime_types.get(output_format.lower(), "image/webp")
                 
                 st.success("✅ Conversion successful!")
+                st.markdown(
+                    f"**Original size:** {_format_size(float(original_size))}  \n"
+                    f"**Converted size:** {_format_size(float(converted_size))}  \n"
+                    f"**Change:** {size_diff:+,} bytes "
+                    f"({percent_change:+.2f}%)"
+                )
                 st.download_button(
                     label=f"Download as {output_format}",
                     data=converted_img,
@@ -136,12 +208,14 @@ if uploaded_file is not None:
 st.markdown("---")
 st.markdown("""
 ### Supported Formats
-- **Input:** PNG, JPEG, JFIF, BMP, WebP
-- **Output:** WebP (via libwebp API), PNG, JPEG, JFIF, BMP
+- **Input:** PNG, JPEG, JFIF, BMP, WebP, AVIF
+- **Output:** AVIF, WebP (via libwebp API), PNG, JPEG, JFIF, BMP
 
 ### Features
 - Direct integration with libwebp C API for WebP encoding/decoding
-- Lossless and lossy WebP encoding options
+- AVIF output support via Pillow/pillow-avif-plugin
+- Lossless and lossy WebP/AVIF encoding options
+- Advanced optimization using MozJPEG, OxiPNG, and OptiPNG when available
 - Quality control for lossy formats
 - Automatic format detection and conversion
 """)
