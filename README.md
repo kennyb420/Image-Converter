@@ -11,7 +11,8 @@ A modern, web-based image converter built with Streamlit that uses the **libwebp
 - 🔌 **Direct libwebp API Integration**: Uses Python's `ctypes` to call libwebp C functions directly
 - 🎨 **WebP Support**: Full support for WebP encoding (lossy and lossless) and decoding
 - 🧪 **AVIF Support**: Advanced, high-efficiency AVIF image encoding via Pillow/`pillow-avif-plugin`
-- 📸 **Multiple Formats**: Supports PNG, JPEG, JFIF, BMP, WebP, and AVIF
+- 🎭 **SVG Support**: Vector SVG files can be rasterized and converted to raster formats
+- 📸 **Multiple Formats**: Supports PNG, JPEG, JFIF, BMP, WebP, AVIF, and SVG
 - ⚙️ **Quality Control**: Adjustable quality settings (0-100) for lossy formats
 - 🎯 **Lossless Option**: Option for lossless WebP and AVIF encoding
 - 🛠️ **Advanced Compression Tools**:
@@ -58,6 +59,7 @@ This will install:
 - `Pillow` (>=10.0.0) - Image processing
 - `numpy` (>=1.24.0) - Array handling
 - `pillow-avif-plugin` (>=1.4.6) - AVIF encoding/decoding support
+- `cairosvg` (>=2.7.0) - SVG rasterization support
 
 ### Step 3: Install libwebp Library
 
@@ -148,13 +150,16 @@ The application will automatically open in your default browser at `http://local
 
 ### Using the Image Converter
 
-1. **Upload an Image**: Click "Upload an Image" and select a file (PNG, JPEG, JFIF, BMP, or WebP)
+1. **Upload an Image**: Click "Upload an Image" and select a file (PNG, JPEG, JFIF, BMP, WebP, AVIF, or SVG)
 2. **Select Output Format**: Choose your desired output format from the dropdown
 3. **Adjust Settings**:
    - **Quality**: Adjust the quality slider (0-100) for lossy formats
-   - **Lossless**: Enable lossless encoding for WebP output (checkbox)
+   - **Lossless**: Enable lossless encoding for WebP/AVIF output (checkbox)
+   - **Advanced optimization**: Enable for PNG/JPEG to use MozJPEG/OxiPNG/OptiPNG (if available)
 4. **Convert**: Click the "Convert 📸" button
 5. **Download**: Click the download button to save your converted image
+
+**Note**: SVG files are automatically rasterized before conversion to the selected format.
 
 ### Example Use Cases
 
@@ -201,6 +206,7 @@ The `imgconvrtr.py` module uses Python's `ctypes` library to directly call libwe
 |--------|-------|--------|--------|
 | AVIF   | ✅    | ✅     | Pillow + `pillow-avif-plugin` |
 | WebP   | ✅    | ✅     | libwebp API (with Pillow fallback) |
+| SVG    | ✅    | ❌     | cairosvg (rasterized to other formats) |
 | PNG    | ✅    | ✅     | Pillow (+ OxiPNG/OptiPNG when available) |
 | JPEG   | ✅    | ✅     | Pillow (+ MozJPEG when available) |
 | JFIF   | ✅    | ✅     | Pillow |

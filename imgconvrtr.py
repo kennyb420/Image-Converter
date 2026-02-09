@@ -9,6 +9,13 @@ from ctypes.util import find_library
 from PIL import Image
 import numpy as np
 
+# Try importing cairosvg for SVG support
+try:
+    import cairosvg
+    _cairosvg_available = True
+except ImportError:
+    _cairosvg_available = False
+
 # Try importing pillow-avif-plugin for AVIF support
 try:
     import pillow_avif
@@ -262,6 +269,46 @@ def get_compression_tools():
     return _compression_tools.copy()
 
 
+def rasterize_svg(svg_data, width=None, height=None, dpi=96):
+    """
+    Rasterize SVG data to a PIL Image.
+    
+    Args:
+        svg_data: bytes or string of SVG data
+        width: target width in pixels (None for auto)
+        height: target height in pixels (None for auto)
+        dpi: resolution for rasterization (default 96)
+    
+    Returns:
+        PIL.Image: Rasterized image
+    """
+    if not _cairosvg_available:
+        raise RuntimeError(
+            "SVG support requires cairosvg. Install it with: pip install cairosvg"
+        )
+    
+    # Convert bytes to string if needed
+    if isinstance(svg_data, bytes):
+        svg_string = svg_data.decode('utf-8', errors='ignore')
+    else:
+        svg_string = svg_data
+    
+    # Convert SVG to PNG bytes using cairosvg
+    try:
+        png_bytes = cairosvg.svg2png(
+            bytestring=svg_string.encode('utf-8') if isinstance(svg_string, str) else svg_string,
+            output_width=width,
+            output_height=height,
+            dpi=dpi
+        )
+    except Exception as e:
+        raise RuntimeError(f"SVG rasterization failed: {e}")
+    
+    # Convert PNG bytes to PIL Image
+    img = Image.open(io.BytesIO(png_bytes))
+    return img
+
+
 def optimize_png(png_data, tool='auto'):
     """
     Optimize PNG using OxiPNG or OptiPNG.
@@ -447,7 +494,7 @@ def decode_from_webp(webp_data):
 
 def convert_img_format(image_file, output_format, quality=80, lossless=False, optimize=False):
     """
-    Convert image format with support for AVIF, WebP, and optimization.
+    Convert image format with support for AVIF, WebP, SVG, and optimization.
     
     Args:
         image_file: file-like object or bytes
@@ -480,11 +527,37 @@ def convert_img_format(image_file, output_format, quality=80, lossless=False, op
         if not image_data:
             raise ValueError("Empty image data provided")
     
-    # Now open with PIL using the bytes data
-    try:
-        img = Image.open(io.BytesIO(image_data))
-    except Exception as e:
-        raise ValueError(f"Could not identify image format. The file may be corrupted or in an unsupported format: {e}")
+    # Check if input is SVG and rasterize it first
+    is_svg = False
+    if isinstance(image_data, bytes):
+        # Check for SVG magic bytes or XML declaration
+        try:
+            image_data_str = image_data[:200].decode('utf-8', errors='ignore').strip()
+            if image_data_str.startswith('<?xml') or image_data_str.startswith('<svg'):
+                is_svg = True
+        except:
+            pass
+        # Also check filename if available
+        if not is_svg and hasattr(image_file, 'name') and image_file.name:
+            if image_file.name.lower().endswith('.svg'):
+                is_svg = True
+    
+    # Rasterize SVG if needed
+    if is_svg:
+        if not _cairosvg_available:
+            raise RuntimeError(
+                "SVG support requires cairosvg. Install it with: pip install cairosvg"
+            )
+        try:
+            img = rasterize_svg(image_data)
+        except Exception as e:
+            raise RuntimeError(f"SVG rasterization failed: {e}")
+    else:
+        # Now open with PIL using the bytes data
+        try:
+            img = Image.open(io.BytesIO(image_data))
+        except Exception as e:
+            raise ValueError(f"Could not identify image format. The file may be corrupted or in an unsupported format: {e}")
     
     # Convert to RGBA for consistent handling
     if img.mode != 'RGBA':

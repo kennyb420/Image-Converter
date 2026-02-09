@@ -90,18 +90,37 @@ if not libwebp_available or not libavif_available:
         
         st.info("💡 **Tip:** Use Option 1 (automatic setup) for the easiest installation!")
 
-# File Uploader - Support more formats including WebP and AVIF
+# File Uploader - Support more formats including WebP, AVIF, and SVG
 uploaded_file = st.file_uploader(
     "Upload an Image", 
-    type=["png", "jpg", "jpeg", "jfif", "bmp", "webp", "avif"]
+    type=["png", "jpg", "jpeg", "jfif", "bmp", "webp", "avif", "svg"]
 )
 
 if uploaded_file is not None:
     # Display the uploaded image
-    img = Image.open(uploaded_file)
-    st.image(img, caption="Uploaded Image", width="stretch")
-    st.write(f"**Original format:** {img.format}")
-    st.write(f"**Image dimensions:** {img.size[0]} x {img.size[1]} pixels")
+    # Handle SVG separately since it's a vector format
+    file_extension = uploaded_file.name.lower().split('.')[-1] if uploaded_file.name else ''
+    is_svg = file_extension == 'svg'
+    
+    if is_svg:
+        # For SVG, we'll rasterize it for display
+        from imgconvrtr import rasterize_svg
+        try:
+            svg_data = uploaded_file.read()
+            uploaded_file.seek(0)  # Reset for conversion
+            img = rasterize_svg(svg_data)
+            st.image(img, caption="Uploaded SVG Image (rasterized for preview)", width="stretch")
+            st.write(f"**Original format:** SVG")
+            st.write(f"**Image dimensions:** {img.size[0]} x {img.size[1]} pixels")
+            st.info("ℹ️ SVG files will be rasterized before conversion to the selected format.")
+        except Exception as e:
+            st.error(f"❌ Could not load SVG: {str(e)}")
+            st.stop()
+    else:
+        img = Image.open(uploaded_file)
+        st.image(img, caption="Uploaded Image", width="stretch")
+        st.write(f"**Original format:** {img.format}")
+        st.write(f"**Image dimensions:** {img.size[0]} x {img.size[1]} pixels")
     
     # Format selection dropdown - Include WebP and AVIF
     output_format = st.selectbox(
@@ -208,7 +227,7 @@ if uploaded_file is not None:
 st.markdown("---")
 st.markdown("""
 ### Supported Formats
-- **Input:** PNG, JPEG, JFIF, BMP, WebP, AVIF
+- **Input:** PNG, JPEG, JFIF, BMP, WebP, AVIF, SVG
 - **Output:** AVIF, WebP (via libwebp API), PNG, JPEG, JFIF, BMP
 
 ### Features
