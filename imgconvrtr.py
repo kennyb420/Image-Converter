@@ -427,7 +427,7 @@ def optimize_png(png_data, tool='auto'):
         return png_data  # Return original on error
 
 
-def optimize_jpeg_mozjpeg(rgb_data, width, height, quality=80):
+def optimize_jpeg_mozjpeg(rgb_data, width, height, quality=50):
     """
     Optimize JPEG using MozJPEG.
     
