@@ -59,7 +59,8 @@ This will install:
 - `Pillow` (>=10.0.0) - Image processing
 - `numpy` (>=1.24.0) - Array handling
 - `pillow-avif-plugin` (>=1.4.6) - AVIF encoding/decoding support
-- `cairosvg` (>=2.7.0) - SVG rasterization support
+- `svglib` (>=1.5.1) - SVG rasterization support (pure Python, Windows compatible)
+- `reportlab` (>=4.0.0) - Required by svglib for rendering
 
 ### Step 3: Install libwebp Library
 
@@ -206,7 +207,7 @@ The `imgconvrtr.py` module uses Python's `ctypes` library to directly call libwe
 |--------|-------|--------|--------|
 | AVIF   | ✅    | ✅     | Pillow + `pillow-avif-plugin` |
 | WebP   | ✅    | ✅     | libwebp API (with Pillow fallback) |
-| SVG    | ✅    | ❌     | cairosvg (rasterized to other formats) |
+| SVG    | ✅    | ❌     | svglib + reportlab (rasterized to other formats) |
 | PNG    | ✅    | ✅     | Pillow (+ OxiPNG/OptiPNG when available) |
 | JPEG   | ✅    | ✅     | Pillow (+ MozJPEG when available) |
 | JFIF   | ✅    | ✅     | Pillow |

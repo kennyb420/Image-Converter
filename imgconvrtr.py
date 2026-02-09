@@ -9,12 +9,13 @@ from ctypes.util import find_library
 from PIL import Image
 import numpy as np
 
-# Try importing cairosvg for SVG support
+# Try importing svglib for SVG support (pure Python, works on Windows)
 try:
-    import cairosvg
-    _cairosvg_available = True
+    from svglib.svglib import svg2rlg
+    from reportlab.graphics import renderPM
+    _svg_available = True
 except ImportError:
-    _cairosvg_available = False
+    _svg_available = False
 
 # Try importing pillow-avif-plugin for AVIF support
 try:
@@ -271,7 +272,7 @@ def get_compression_tools():
 
 def rasterize_svg(svg_data, width=None, height=None, dpi=96):
     """
-    Rasterize SVG data to a PIL Image.
+    Rasterize SVG data to a PIL Image using svglib.
     
     Args:
         svg_data: bytes or string of SVG data
@@ -282,9 +283,9 @@ def rasterize_svg(svg_data, width=None, height=None, dpi=96):
     Returns:
         PIL.Image: Rasterized image
     """
-    if not _cairosvg_available:
+    if not _svg_available:
         raise RuntimeError(
-            "SVG support requires cairosvg. Install it with: pip install cairosvg"
+            "SVG support requires svglib and reportlab. Install with: pip install svglib reportlab"
         )
     
     # Convert bytes to string if needed
@@ -293,20 +294,40 @@ def rasterize_svg(svg_data, width=None, height=None, dpi=96):
     else:
         svg_string = svg_data
     
-    # Convert SVG to PNG bytes using cairosvg
+    # Create a temporary file-like object for svglib
+    svg_io = io.StringIO(svg_string) if isinstance(svg_string, str) else io.BytesIO(svg_data)
+    
     try:
-        png_bytes = cairosvg.svg2png(
-            bytestring=svg_string.encode('utf-8') if isinstance(svg_string, str) else svg_string,
-            output_width=width,
-            output_height=height,
-            dpi=dpi
-        )
+        # Convert SVG to ReportLab drawing
+        drawing = svg2rlg(svg_io)
+        
+        if drawing is None:
+            raise RuntimeError("Failed to parse SVG file")
+        
+        # Scale if dimensions specified
+        if width or height:
+            scale_x = scale_y = 1.0
+            if width and drawing.width:
+                scale_x = width / drawing.width
+            if height and drawing.height:
+                scale_y = height / drawing.height
+            if width and height:
+                # Use the smaller scale to maintain aspect ratio
+                scale = min(scale_x, scale_y)
+            else:
+                scale = scale_x if width else scale_y
+            drawing.width *= scale
+            drawing.height *= scale
+            drawing.scale(scale, scale)
+        
+        # Render to PNG bytes
+        png_bytes = renderPM.drawToString(drawing, fmt='PNG', dpi=dpi)
+        
+        # Convert PNG bytes to PIL Image
+        img = Image.open(io.BytesIO(png_bytes))
+        return img
     except Exception as e:
         raise RuntimeError(f"SVG rasterization failed: {e}")
-    
-    # Convert PNG bytes to PIL Image
-    img = Image.open(io.BytesIO(png_bytes))
-    return img
 
 
 def optimize_png(png_data, tool='auto'):
@@ -544,9 +565,9 @@ def convert_img_format(image_file, output_format, quality=80, lossless=False, op
     
     # Rasterize SVG if needed
     if is_svg:
-        if not _cairosvg_available:
+        if not _svg_available:
             raise RuntimeError(
-                "SVG support requires cairosvg. Install it with: pip install cairosvg"
+                "SVG support requires svglib and reportlab. Install with: pip install svglib reportlab"
             )
         try:
             img = rasterize_svg(image_data)

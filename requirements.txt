@@ -5,6 +5,7 @@ numpy>=1.24.0
 # AVIF support
 pillow-avif-plugin>=1.4.6
 
-# SVG support
-cairosvg>=2.7.0
+# SVG support (pure Python, works on Windows without system libraries)
+svglib>=1.5.1
+reportlab>=4.0.0
 
