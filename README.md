@@ -2,7 +2,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.28+-red.svg)](https://streamlit.io/)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 A modern, web-based image converter built with Streamlit that uses the **libwebp C API directly** for WebP encoding and decoding. Convert between multiple image formats with support for lossy and lossless WebP compression.
 
@@ -372,7 +372,7 @@ streamlit run app.py
 
 ## 📄 License
 
-This project is open source and available under the [MIT License](LICENSE).
+This project is open source and available under the [GNU General Public License v3](LICENSE).
 
 ### Third-Party Licenses
 
