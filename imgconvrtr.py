@@ -312,13 +312,20 @@ def rasterize_svg(svg_data, width=None, height=None, dpi=96):
     else:
         svg_string = svg_data.decode('utf-8', errors='ignore')
     
-    # Remove XML encoding declaration if present (svglib doesn't support it)
+    # Remove XML encoding declaration and DOCTYPE if present (svglib doesn't support them)
     svg_string = svg_string.strip()
+    
+    # Remove XML declaration
     if svg_string.startswith('<?xml'):
-        # Find the end of the XML declaration
-        end_decl = svg_string.find('?>')
-        if end_decl != -1:
-            svg_string = svg_string[end_decl + 2:].strip()
+        end_xml = svg_string.find('?>')
+        if end_xml != -1:
+            svg_string = svg_string[end_xml + 2:].strip()
+    
+    # Remove DOCTYPE declaration if present
+    if svg_string.startswith('<!DOCTYPE'):
+        end_doctype = svg_string.find('>')
+        if end_doctype != -1:
+            svg_string = svg_string[end_doctype + 1:].strip()
     
     # Convert back to bytes for svglib (it requires bytes input)
     svg_bytes = svg_string.encode('utf-8')
