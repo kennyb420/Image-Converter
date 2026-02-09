@@ -306,14 +306,25 @@ def rasterize_svg(svg_data, width=None, height=None, dpi=96):
     from svglib.svglib import svg2rlg
     from reportlab.pdfgen import canvas
     
-    # Convert bytes to string if needed
-    if isinstance(svg_data, bytes):
-        svg_string = svg_data.decode('utf-8', errors='ignore')
-    else:
+    # Convert to bytes and remove XML encoding declaration (svglib requirement)
+    if isinstance(svg_data, str):
         svg_string = svg_data
+    else:
+        svg_string = svg_data.decode('utf-8', errors='ignore')
     
-    # Create a temporary file-like object for svglib
-    svg_io = io.StringIO(svg_string) if isinstance(svg_string, str) else io.BytesIO(svg_data)
+    # Remove XML encoding declaration if present (svglib doesn't support it)
+    svg_string = svg_string.strip()
+    if svg_string.startswith('<?xml'):
+        # Find the end of the XML declaration
+        end_decl = svg_string.find('?>')
+        if end_decl != -1:
+            svg_string = svg_string[end_decl + 2:].strip()
+    
+    # Convert back to bytes for svglib (it requires bytes input)
+    svg_bytes = svg_string.encode('utf-8')
+    
+    # Create a BytesIO object for svglib
+    svg_io = io.BytesIO(svg_bytes)
     
     try:
         # Convert SVG to ReportLab drawing
