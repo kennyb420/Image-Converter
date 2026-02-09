@@ -394,14 +394,6 @@ If you encounter any issues or have questions:
 2. Review the diagnostic information in the app
 3. Open an [Issue](https://github.com/yourusername/IMGCONVERTOR/issues) on GitHub
 
-## 🗺️ Roadmap
-
-- [ ] Batch conversion support
-- [ ] Additional image formats (TIFF, GIF, etc.)
-- [ ] Image optimization suggestions
-- [ ] Conversion history
-- [ ] API endpoint for programmatic access
-
 ---
 
 Made with ❤️ using Streamlit and libwebp
