@@ -136,6 +136,42 @@ To enable advanced compression for JPEG and PNG, install:
 
 If these tools are not installed, the app will still work and fall back to Pillow’s built-in optimizations.
 
+### Optional: SVG Support Setup
+
+SVG support requires `pdf2image` which needs `poppler` on Windows:
+
+**Windows (Choose one method):**
+
+**Method 1: Manual Installation (No Admin Required - Recommended)**
+1. Download poppler for Windows from: https://github.com/oschwartz10612/poppler-windows/releases/
+2. Extract the ZIP file to a location like `C:\Users\YourName\poppler` or `C:\poppler`
+3. Add the `bin` folder to your user PATH:
+   - Open PowerShell and run: `[Environment]::SetEnvironmentVariable("Path", $env:Path + ";C:\path\to\poppler\bin", "User")`
+   - Replace `C:\path\to\poppler\bin` with your actual poppler bin folder path (e.g., `C:\poppler\Library\bin`)
+   - Restart your terminal/IDE for the PATH change to take effect
+   - Verify: Run `pdftoppm -h` in a new terminal window
+
+**Method 2: Chocolatey (Requires Admin)**
+1. Open PowerShell as Administrator (Right-click → Run as Administrator)
+2. Run: `choco install poppler`
+
+**Method 3: Scoop (No Admin Required)**
+1. Install Scoop if you don't have it: https://scoop.sh/
+2. Run: `scoop install poppler`
+
+**Linux:**
+```bash
+sudo apt-get install poppler-utils  # Ubuntu/Debian
+sudo dnf install poppler-utils      # Fedora
+```
+
+**macOS:**
+```bash
+brew install poppler
+```
+
+If poppler is not installed, SVG conversion will show a helpful error message. The app will still work for all other formats.
+
 ### Step 4: Verify Installation
 
 Run the application and check the status indicator at the top of the page. It will show:
