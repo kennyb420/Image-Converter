@@ -59,8 +59,11 @@ This will install:
 - `Pillow` (>=10.0.0) - Image processing
 - `numpy` (>=1.24.0) - Array handling
 - `pillow-avif-plugin` (>=1.4.6) - AVIF encoding/decoding support
-- `svglib` (>=1.5.1) - SVG rasterization support (pure Python, Windows compatible)
-- `reportlab` (>=4.0.0) - Required by svglib for rendering
+- `svglib` (>=1.5.1) - SVG to ReportLab drawing conversion
+- `reportlab` (>=4.0.0) - PDF rendering (no Cairo dependency)
+- `pdf2image` (>=1.16.0) - PDF to image conversion
+
+**Note for SVG support on Windows**: `pdf2image` requires `poppler` to be installed. See [pdf2image installation guide](https://github.com/Belval/pdf2image) for Windows setup instructions.
 
 ### Step 3: Install libwebp Library
 

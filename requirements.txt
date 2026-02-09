@@ -5,7 +5,8 @@ numpy>=1.24.0
 # AVIF support
 pillow-avif-plugin>=1.4.6
 
-# SVG support (pure Python, works on Windows without system libraries)
+# SVG support (uses PDF as intermediate format to avoid Cairo dependency)
 svglib>=1.5.1
 reportlab>=4.0.0
+pdf2image>=1.16.0
 

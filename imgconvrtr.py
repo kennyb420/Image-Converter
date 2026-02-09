@@ -9,13 +9,8 @@ from ctypes.util import find_library
 from PIL import Image
 import numpy as np
 
-# Try importing svglib for SVG support (pure Python, works on Windows)
-try:
-    from svglib.svglib import svg2rlg
-    from reportlab.graphics import renderPM
-    _svg_available = True
-except ImportError:
-    _svg_available = False
+# SVG support will be lazy-loaded to avoid import errors if dependencies aren't available
+_svg_available = None  # Will be checked on first use
 
 # Try importing pillow-avif-plugin for AVIF support
 try:
@@ -270,9 +265,27 @@ def get_compression_tools():
     return _compression_tools.copy()
 
 
+def _check_svg_support():
+    """Lazy-load SVG dependencies to avoid import errors at module level."""
+    global _svg_available
+    if _svg_available is None:
+        try:
+            # Test if dependencies are available without importing renderPM
+            from svglib.svglib import svg2rlg
+            from reportlab.pdfgen import canvas
+            from pdf2image import convert_from_bytes
+            _svg_available = True
+        except (ImportError, OSError):
+            # OSError can occur if pdf2image can't find poppler
+            _svg_available = False
+    return _svg_available
+
+
 def rasterize_svg(svg_data, width=None, height=None, dpi=96):
     """
-    Rasterize SVG data to a PIL Image using svglib.
+    Rasterize SVG data to a PIL Image using svglib and reportlab PDF rendering.
+    Uses PDF as an intermediate format to avoid Cairo dependency.
+    Requires pdf2image for PDF to image conversion.
     
     Args:
         svg_data: bytes or string of SVG data
@@ -283,10 +296,15 @@ def rasterize_svg(svg_data, width=None, height=None, dpi=96):
     Returns:
         PIL.Image: Rasterized image
     """
-    if not _svg_available:
+    if not _check_svg_support():
         raise RuntimeError(
-            "SVG support requires svglib and reportlab. Install with: pip install svglib reportlab"
+            "SVG support requires svglib, reportlab, and pdf2image. Install with: pip install svglib reportlab pdf2image\n"
+            "Note: pdf2image also requires poppler. See README for installation instructions."
         )
+    
+    # Import here to avoid import errors at module level
+    from svglib.svglib import svg2rlg
+    from reportlab.pdfgen import canvas
     
     # Convert bytes to string if needed
     if isinstance(svg_data, bytes):
@@ -320,12 +338,30 @@ def rasterize_svg(svg_data, width=None, height=None, dpi=96):
             drawing.height *= scale
             drawing.scale(scale, scale)
         
-        # Render to PNG bytes
-        png_bytes = renderPM.drawToString(drawing, fmt='PNG', dpi=dpi)
+        # Render to PDF bytes using canvas (this doesn't require Cairo)
+        page_width = drawing.width if drawing.width else 800
+        page_height = drawing.height if drawing.height else 600
+        pdf_buffer = io.BytesIO()
+        c = canvas.Canvas(pdf_buffer, pagesize=(page_width, page_height))
+        drawing.drawOn(c, 0, 0)
+        c.save()
+        pdf_bytes = pdf_buffer.getvalue()
+        pdf_buffer.close()
         
-        # Convert PNG bytes to PIL Image
-        img = Image.open(io.BytesIO(png_bytes))
-        return img
+        # Convert PDF to image using pdf2image
+        try:
+            from pdf2image import convert_from_bytes
+            images = convert_from_bytes(pdf_bytes, dpi=dpi)
+            if images:
+                return images[0]  # Return first page
+            else:
+                raise RuntimeError("PDF conversion produced no images")
+        except ImportError:
+            raise RuntimeError(
+                "PDF to image conversion requires pdf2image. Install with: pip install pdf2image\n"
+                "Note: On Windows, you may also need poppler-utils. See installation instructions in README."
+            )
+        
     except Exception as e:
         raise RuntimeError(f"SVG rasterization failed: {e}")
 
@@ -565,10 +601,6 @@ def convert_img_format(image_file, output_format, quality=80, lossless=False, op
     
     # Rasterize SVG if needed
     if is_svg:
-        if not _svg_available:
-            raise RuntimeError(
-                "SVG support requires svglib and reportlab. Install with: pip install svglib reportlab"
-            )
         try:
             img = rasterize_svg(image_data)
         except Exception as e:
