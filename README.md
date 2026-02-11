@@ -51,11 +51,32 @@ cd IMGCONVERTOR
 
 ### Step 2: Install Python Dependencies
 
+#### Option A: Development Installation (Recommended for Development)
+
 ```bash
 pip install -r requirements.txt
 ```
 
-This will install:
+This will install the minimum required versions and allow automatic updates for bug fixes and security patches.
+
+#### Option B: Production Installation (Recommended for Production/Deployment)
+
+```bash
+pip install -r requirements-lock.txt
+```
+
+This installs exact pinned versions for reproducible builds and consistent environments across different machines.
+
+**Which file to use?**
+- **`requirements.txt`**: Use for development. Contains minimum version requirements (`>=`) allowing flexibility for updates.
+- **`requirements-lock.txt`**: Use for production deployments. Contains exact pinned versions (`==`) ensuring everyone gets the same package versions.
+
+**To regenerate `requirements-lock.txt`** (after updating dependencies):
+```bash
+pip freeze > requirements-lock.txt
+```
+
+**Dependencies installed:**
 - `streamlit` (>=1.28.0) - Web interface
 - `Pillow` (>=10.0.0) - Image processing
 - `numpy` (>=1.24.0) - Array handling
@@ -218,7 +239,8 @@ IMGCONVERTOR/
 │
 ├── app.py                 # Main Streamlit application
 ├── imgconvrtr.py          # Image conversion module with libwebp integration
-├── requirements.txt       # Python dependencies
+├── requirements.txt       # Python dependencies (minimum versions for development)
+├── requirements-lock.txt  # Locked dependency versions (exact versions for production)
 ├── setup_libwebp.ps1      # PowerShell setup script for Windows
 ├── setup_libwebp.bat      # Batch setup script for Windows
 ├── README.md              # This file

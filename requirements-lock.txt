@@ -1,0 +1,16 @@
+# Locked dependency versions for reproducible builds
+# Generated with: pip freeze
+# Use this file for production deployments to ensure consistent environments
+
+# Core dependencies
+streamlit==1.52.1
+Pillow==12.0.0
+numpy==2.3.5
+
+# AVIF support
+pillow-avif-plugin==1.5.5
+
+# SVG support (uses PDF as intermediate format to avoid Cairo dependency)
+svglib==1.6.0
+reportlab==4.4.9
+pdf2image==1.17.0
