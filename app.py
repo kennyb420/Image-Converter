@@ -1,4 +1,5 @@
 import streamlit as st
+import time
 from PIL import Image
 from imgconvrtr import convert_img_format
 
@@ -163,7 +164,7 @@ if uploaded_file is not None:
             "Quality (for lossy formats)", 
             min_value=0, 
             max_value=100, 
-            value=80,
+            value=50,
             help="Higher values mean better quality but larger file size"
         )
     
@@ -187,135 +188,172 @@ if uploaded_file is not None:
     
     # Convert and download the image
     if st.button("Convert 📸"):
-        with st.spinner("Converting image..."):
-            try:
-                # Calculate original file size
-                original_bytes = uploaded_file.getvalue()
-                original_size = len(original_bytes) if original_bytes else 0
+        # Initialize progress bar
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        try:
+            # Step 1: Reading and validating file
+            status_text.text("📖 Reading image file...")
+            progress_bar.progress(10)
+            original_bytes = uploaded_file.getvalue()
+            original_size = len(original_bytes) if original_bytes else 0
+            
+            # Step 2: Starting conversion
+            if optimize:
+                status_text.text(f"🔄 Converting to {output_format.upper()} format with optimization...")
+                progress_bar.progress(25)
+            else:
+                status_text.text(f"🔄 Converting to {output_format.upper()} format...")
+                progress_bar.progress(30)
+            
+            converted_img = convert_img_format(
+                uploaded_file,
+                output_format.lower(),
+                quality=quality,
+                lossless=lossless,
+                optimize=optimize,
+            )
+            
+            # Step 3: Processing converted image
+            status_text.text("📊 Processing converted image...")
+            progress_bar.progress(70 if not optimize else 75)
+            converted_bytes = converted_img.getvalue()
+            converted_size = len(converted_bytes)
 
-                converted_img = convert_img_format(
-                    uploaded_file,
-                    output_format.lower(),
-                    quality=quality,
-                    lossless=lossless,
-                    optimize=optimize,
-                )
-                
-                # Calculate converted file size
-                converted_bytes = converted_img.getvalue()
-                converted_size = len(converted_bytes)
+            # Step 4: Calculating statistics
+            status_text.text("📈 Calculating conversion statistics...")
+            progress_bar.progress(85)
+            
+            # Compute size change and percentage
+            size_diff = converted_size - original_size
+            if original_size > 0:
+                percent_change = (size_diff / original_size) * 100
+            else:
+                percent_change = 0.0
 
-                # Compute size change and percentage
-                size_diff = converted_size - original_size
-                if original_size > 0:
-                    percent_change = (size_diff / original_size) * 100
+            def _format_size(num_bytes: int) -> str:
+                """Format bytes into a human-readable string."""
+                for unit in ["B", "KB", "MB", "GB"]:
+                    if num_bytes < 1024.0 or unit == "GB":
+                        return f"{num_bytes:.1f} {unit}"
+                    num_bytes /= 1024.0
+                return f"{num_bytes:.1f} GB"
+
+            # Determine MIME type
+            mime_types = {
+                "webp": "image/webp",
+                "png": "image/png",
+                "jpeg": "image/jpeg",
+                "jpg": "image/jpeg",
+                "jfif": "image/jpeg",
+                "bmp": "image/bmp",
+                "avif": "image/avif",
+            }
+            
+            mime_type = mime_types.get(output_format.lower(), "image/webp")
+            
+            # Step 5: Preparing display
+            status_text.text("🎨 Preparing image preview...")
+            progress_bar.progress(95)
+            
+            # Complete progress
+            progress_bar.progress(100)
+            status_text.text("✅ Conversion complete!")
+            
+            # Small delay to show completion
+            time.sleep(0.3)
+            
+            # Clear progress indicators
+            progress_bar.empty()
+            status_text.empty()
+            
+            st.success("✅ Conversion successful!")
+            
+            # Before/After Image Comparison
+            st.markdown("### 📊 Before/After Comparison")
+            col_before, col_after = st.columns(2)
+            
+            # Load images for display
+            # Reuse the original image that was already loaded and displayed
+            if original_img_for_comparison is not None:
+                original_img = original_img_for_comparison
+            else:
+                # Fallback: load it fresh if somehow not stored
+                uploaded_file.seek(0)  # Reset file pointer
+                if is_svg:
+                    from imgconvrtr import rasterize_svg
+                    svg_data = uploaded_file.read()
+                    uploaded_file.seek(0)  # Reset for download
+                    original_img = rasterize_svg(svg_data)
                 else:
-                    percent_change = 0.0
-
-                def _format_size(num_bytes: int) -> str:
-                    """Format bytes into a human-readable string."""
-                    for unit in ["B", "KB", "MB", "GB"]:
-                        if num_bytes < 1024.0 or unit == "GB":
-                            return f"{num_bytes:.1f} {unit}"
-                        num_bytes /= 1024.0
-                    return f"{num_bytes:.1f} GB"
-
-                # Determine MIME type
-                mime_types = {
-                    "webp": "image/webp",
-                    "png": "image/png",
-                    "jpeg": "image/jpeg",
-                    "jpg": "image/jpeg",
-                    "jfif": "image/jpeg",
-                    "bmp": "image/bmp",
-                    "avif": "image/avif",
-                }
-                
-                mime_type = mime_types.get(output_format.lower(), "image/webp")
-                
-                st.success("✅ Conversion successful!")
-                
-                # Before/After Image Comparison
-                st.markdown("### 📊 Before/After Comparison")
-                col_before, col_after = st.columns(2)
-                
-                # Load images for display
-                # Reuse the original image that was already loaded and displayed
-                if original_img_for_comparison is not None:
-                    original_img = original_img_for_comparison
-                else:
-                    # Fallback: load it fresh if somehow not stored
-                    uploaded_file.seek(0)  # Reset file pointer
-                    if is_svg:
-                        from imgconvrtr import rasterize_svg
-                        svg_data = uploaded_file.read()
-                        uploaded_file.seek(0)  # Reset for download
-                        original_img = rasterize_svg(svg_data)
-                    else:
-                        original_img = Image.open(uploaded_file)
-                
-                # Load converted image for display
-                converted_img.seek(0)  # Reset BytesIO pointer
-                converted_img_display = Image.open(converted_img)
-                converted_img.seek(0)  # Reset again for download button
-                
-                with col_before:
-                    st.markdown("**📷 Original Image**")
-                    st.image(original_img, use_container_width=True)
-                    original_format_display = "SVG" if is_svg else (original_img.format or 'Unknown')
-                    st.caption(f"**Format:** {original_format_display}")
-                    st.caption(f"**Size:** {_format_size(float(original_size))}")
-                    st.caption(f"**Dimensions:** {original_img.size[0]} × {original_img.size[1]} px")
-                
-                with col_after:
-                    st.markdown("**✨ Converted Image**")
-                    st.image(converted_img_display, use_container_width=True)
-                    st.caption(f"**Format:** {output_format.upper()}")
-                    st.caption(f"**Size:** {_format_size(float(converted_size))}")
-                    st.caption(f"**Dimensions:** {converted_img_display.size[0]} × {converted_img_display.size[1]} px")
-                
-                # Size comparison statistics
-                st.markdown("---")
-                st.markdown("### 📈 Size Comparison")
-                col_stat1, col_stat2, col_stat3 = st.columns(3)
-                
-                with col_stat1:
-                    st.metric(
-                        label="Original Size",
-                        value=_format_size(float(original_size))
-                    )
-                
-                with col_stat2:
-                    st.metric(
-                        label="Converted Size",
-                        value=_format_size(float(converted_size)),
-                        delta=f"{percent_change:+.2f}%"
-                    )
-                
-                with col_stat3:
-                    size_saved = abs(size_diff) if size_diff < 0 else 0
-                    size_increased = size_diff if size_diff > 0 else 0
-                    if size_diff < 0:
-                        st.metric(
-                            label="Space Saved",
-                            value=_format_size(float(size_saved))
-                        )
-                    else:
-                        st.metric(
-                            label="Size Change",
-                            value=_format_size(float(size_increased))
-                        )
-                
-                st.download_button(
-                    label=f"📥 Download as {output_format}",
-                    data=converted_img,
-                    file_name=f"image.{output_format.lower()}",
-                    mime=mime_type,
-                    use_container_width=True
+                    original_img = Image.open(uploaded_file)
+            
+            # Load converted image for display
+            converted_img.seek(0)  # Reset BytesIO pointer
+            converted_img_display = Image.open(converted_img)
+            converted_img.seek(0)  # Reset again for download button
+            
+            with col_before:
+                st.markdown("**📷 Original Image**")
+                st.image(original_img, use_container_width=True)
+                original_format_display = "SVG" if is_svg else (original_img.format or 'Unknown')
+                st.caption(f"**Format:** {original_format_display}")
+                st.caption(f"**Size:** {_format_size(float(original_size))}")
+                st.caption(f"**Dimensions:** {original_img.size[0]} × {original_img.size[1]} px")
+            
+            with col_after:
+                st.markdown("**✨ Converted Image**")
+                st.image(converted_img_display, use_container_width=True)
+                st.caption(f"**Format:** {output_format.upper()}")
+                st.caption(f"**Size:** {_format_size(float(converted_size))}")
+                st.caption(f"**Dimensions:** {converted_img_display.size[0]} × {converted_img_display.size[1]} px")
+            
+            # Size comparison statistics
+            st.markdown("---")
+            st.markdown("### 📈 Size Comparison")
+            col_stat1, col_stat2, col_stat3 = st.columns(3)
+            
+            with col_stat1:
+                st.metric(
+                    label="Original Size",
+                    value=_format_size(float(original_size))
                 )
-            except Exception as e:
-                st.error(f"❌ Conversion failed: {str(e)}")
-                st.exception(e)
+            
+            with col_stat2:
+                st.metric(
+                    label="Converted Size",
+                    value=_format_size(float(converted_size)),
+                    delta=f"{percent_change:+.2f}%"
+                )
+            
+            with col_stat3:
+                size_saved = abs(size_diff) if size_diff < 0 else 0
+                size_increased = size_diff if size_diff > 0 else 0
+                if size_diff < 0:
+                    st.metric(
+                        label="Space Saved",
+                        value=_format_size(float(size_saved))
+                    )
+                else:
+                    st.metric(
+                        label="Size Change",
+                        value=_format_size(float(size_increased))
+                    )
+            
+            st.download_button(
+                label=f"📥 Download as {output_format}",
+                data=converted_img,
+                file_name=f"image.{output_format.lower()}",
+                mime=mime_type,
+                use_container_width=True
+            )
+        except Exception as e:
+            # Clear progress indicators on error
+            progress_bar.empty()
+            status_text.empty()
+            st.error(f"❌ Conversion failed: {str(e)}")
+            st.exception(e)
 
 # Footer with information
 st.markdown("---")
