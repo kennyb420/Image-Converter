@@ -124,6 +124,9 @@ if uploaded_file is not None:
     file_extension = uploaded_file.name.lower().split('.')[-1] if uploaded_file.name else ''
     is_svg = file_extension == 'svg'
     
+    # Store the original image for later comparison
+    original_img_for_comparison = None
+    
     if is_svg:
         # For SVG, we'll rasterize it for display
         from imgconvrtr import rasterize_svg
@@ -131,6 +134,7 @@ if uploaded_file is not None:
             svg_data = uploaded_file.read()
             uploaded_file.seek(0)  # Reset for conversion
             img = rasterize_svg(svg_data)
+            original_img_for_comparison = img  # Store for comparison
             st.image(img, caption="Uploaded SVG Image (rasterized for preview)", width="stretch")
             st.write(f"**Original format:** SVG")
             st.write(f"**Image dimensions:** {img.size[0]} x {img.size[1]} pixels")
@@ -140,6 +144,7 @@ if uploaded_file is not None:
             st.stop()
     else:
         img = Image.open(uploaded_file)
+        original_img_for_comparison = img.copy()  # Store for comparison
         st.image(img, caption="Uploaded Image", width="stretch")
         st.write(f"**Original format:** {img.format}")
         st.write(f"**Image dimensions:** {img.size[0]} x {img.size[1]} pixels")
@@ -229,17 +234,84 @@ if uploaded_file is not None:
                 mime_type = mime_types.get(output_format.lower(), "image/webp")
                 
                 st.success("✅ Conversion successful!")
-                st.markdown(
-                    f"**Original size:** {_format_size(float(original_size))}  \n"
-                    f"**Converted size:** {_format_size(float(converted_size))}  \n"
-                    f"**Change:** {size_diff:+,} bytes "
-                    f"({percent_change:+.2f}%)"
-                )
+                
+                # Before/After Image Comparison
+                st.markdown("### 📊 Before/After Comparison")
+                col_before, col_after = st.columns(2)
+                
+                # Load images for display
+                # Reuse the original image that was already loaded and displayed
+                if original_img_for_comparison is not None:
+                    original_img = original_img_for_comparison
+                else:
+                    # Fallback: load it fresh if somehow not stored
+                    uploaded_file.seek(0)  # Reset file pointer
+                    if is_svg:
+                        from imgconvrtr import rasterize_svg
+                        svg_data = uploaded_file.read()
+                        uploaded_file.seek(0)  # Reset for download
+                        original_img = rasterize_svg(svg_data)
+                    else:
+                        original_img = Image.open(uploaded_file)
+                
+                # Load converted image for display
+                converted_img.seek(0)  # Reset BytesIO pointer
+                converted_img_display = Image.open(converted_img)
+                converted_img.seek(0)  # Reset again for download button
+                
+                with col_before:
+                    st.markdown("**📷 Original Image**")
+                    st.image(original_img, use_container_width=True)
+                    original_format_display = "SVG" if is_svg else (original_img.format or 'Unknown')
+                    st.caption(f"**Format:** {original_format_display}")
+                    st.caption(f"**Size:** {_format_size(float(original_size))}")
+                    st.caption(f"**Dimensions:** {original_img.size[0]} × {original_img.size[1]} px")
+                
+                with col_after:
+                    st.markdown("**✨ Converted Image**")
+                    st.image(converted_img_display, use_container_width=True)
+                    st.caption(f"**Format:** {output_format.upper()}")
+                    st.caption(f"**Size:** {_format_size(float(converted_size))}")
+                    st.caption(f"**Dimensions:** {converted_img_display.size[0]} × {converted_img_display.size[1]} px")
+                
+                # Size comparison statistics
+                st.markdown("---")
+                st.markdown("### 📈 Size Comparison")
+                col_stat1, col_stat2, col_stat3 = st.columns(3)
+                
+                with col_stat1:
+                    st.metric(
+                        label="Original Size",
+                        value=_format_size(float(original_size))
+                    )
+                
+                with col_stat2:
+                    st.metric(
+                        label="Converted Size",
+                        value=_format_size(float(converted_size)),
+                        delta=f"{percent_change:+.2f}%"
+                    )
+                
+                with col_stat3:
+                    size_saved = abs(size_diff) if size_diff < 0 else 0
+                    size_increased = size_diff if size_diff > 0 else 0
+                    if size_diff < 0:
+                        st.metric(
+                            label="Space Saved",
+                            value=_format_size(float(size_saved))
+                        )
+                    else:
+                        st.metric(
+                            label="Size Change",
+                            value=_format_size(float(size_increased))
+                        )
+                
                 st.download_button(
-                    label=f"Download as {output_format}",
+                    label=f"📥 Download as {output_format}",
                     data=converted_img,
                     file_name=f"image.{output_format.lower()}",
-                    mime=mime_type
+                    mime=mime_type,
+                    use_container_width=True
                 )
             except Exception as e:
                 st.error(f"❌ Conversion failed: {str(e)}")
