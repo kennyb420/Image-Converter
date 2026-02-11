@@ -2,6 +2,10 @@ import streamlit as st
 from PIL import Image
 from imgconvrtr import convert_img_format
 
+# Maximum file size limit: 200MB
+MAX_FILE_SIZE_MB = 200
+MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024  # 200MB in bytes
+
 # App Title
 st.title("Image Converter")
 st.markdown("**Powered by libwebp API, AVIF, and advanced optimizers**")
@@ -93,10 +97,28 @@ if not libwebp_available or not libavif_available:
 # File Uploader - Support more formats including WebP, AVIF, and SVG
 uploaded_file = st.file_uploader(
     "Upload an Image", 
-    type=["png", "jpg", "jpeg", "jfif", "bmp", "webp", "avif", "svg"]
+    type=["png", "jpg", "jpeg", "jfif", "bmp", "webp", "avif", "svg"],
+    help=f"Maximum file size: {MAX_FILE_SIZE_MB}MB"
 )
 
 if uploaded_file is not None:
+    # Check file size limit (200MB)
+    file_size = uploaded_file.size
+    if file_size > MAX_FILE_SIZE_BYTES:
+        def _format_size(num_bytes: int) -> str:
+            """Format bytes into a human-readable string."""
+            for unit in ["B", "KB", "MB", "GB"]:
+                if num_bytes < 1024.0 or unit == "GB":
+                    return f"{num_bytes:.1f} {unit}"
+                num_bytes /= 1024.0
+            return f"{num_bytes:.1f} GB"
+        
+        st.error(
+            f"❌ File size exceeds the maximum limit of {MAX_FILE_SIZE_MB}MB. "
+            f"Your file is {_format_size(file_size)}. "
+            f"Please upload a smaller file."
+        )
+        st.stop()
     # Display the uploaded image
     # Handle SVG separately since it's a vector format
     file_extension = uploaded_file.name.lower().split('.')[-1] if uploaded_file.name else ''

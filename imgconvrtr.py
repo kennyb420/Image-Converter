@@ -9,6 +9,10 @@ from ctypes.util import find_library
 from PIL import Image
 import numpy as np
 
+# Maximum file size limit: 200MB
+MAX_FILE_SIZE_MB = 200
+MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024  # 200MB in bytes
+
 # SVG support will be lazy-loaded to avoid import errors if dependencies aren't available
 _svg_available = None  # Will be checked on first use
 
@@ -591,9 +595,20 @@ def convert_img_format(image_file, output_format, quality=80, lossless=False, op
         # File-like object (e.g., Streamlit UploadedFile)
         try:
             image_file.seek(0)  # Reset to beginning
+            
+            # Check file size before reading if size attribute is available
+            if hasattr(image_file, 'size') and image_file.size > MAX_FILE_SIZE_BYTES:
+                raise ValueError(
+                    f"File size ({image_file.size / (1024 * 1024):.1f}MB) exceeds the maximum limit of {MAX_FILE_SIZE_MB}MB. "
+                    f"Please use a smaller file."
+                )
+            
             image_data = image_file.read()
             if not image_data:
                 raise ValueError("Empty file or could not read file data")
+        except ValueError:
+            # Re-raise ValueError (including our file size error)
+            raise
         except Exception as e:
             raise ValueError(f"Could not read image file: {e}")
     else:
@@ -601,6 +616,14 @@ def convert_img_format(image_file, output_format, quality=80, lossless=False, op
         image_data = image_file
         if not image_data:
             raise ValueError("Empty image data provided")
+    
+    # Check file size after reading (defense in depth)
+    if len(image_data) > MAX_FILE_SIZE_BYTES:
+        file_size_mb = len(image_data) / (1024 * 1024)
+        raise ValueError(
+            f"File size ({file_size_mb:.1f}MB) exceeds the maximum limit of {MAX_FILE_SIZE_MB}MB. "
+            f"Please use a smaller file."
+        )
     
     # Check if input is SVG and rasterize it first
     is_svg = False

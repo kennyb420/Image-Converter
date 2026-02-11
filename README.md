@@ -22,6 +22,7 @@ A modern, web-based image converter built with Streamlit that uses the **libwebp
 - 🔄 **Automatic Fallback**: Falls back to Pillow's WebP support if libwebp is unavailable
 - 🖥️ **Cross-Platform**: Works on Windows, Linux, and macOS
 - 🎨 **Modern UI**: Clean, intuitive Streamlit interface
+- 🛡️ **File Size Protection**: Enforces a 200MB maximum file size limit to prevent resource exhaustion
 
 ## 📋 Table of Contents
 
@@ -191,6 +192,8 @@ The application will automatically open in your default browser at `http://local
 ### Using the Image Converter
 
 1. **Upload an Image**: Click "Upload an Image" and select a file (PNG, JPEG, JFIF, BMP, WebP, AVIF, or SVG)
+   - **File Size Limit**: Maximum file size is **200MB** per file
+   - Files exceeding this limit will be rejected with a clear error message
 2. **Select Output Format**: Choose your desired output format from the dropdown
 3. **Adjust Settings**:
    - **Quality**: Adjust the quality slider (0-100) for lossy formats
@@ -290,6 +293,15 @@ The `imgconvrtr.py` module uses Python's `ctypes` library to directly call libwe
 - Try lossless encoding for WebP if quality is critical
 - For JPEG output, quality 85-95 is usually optimal
 
+**File Size Limit Errors**:
+- **Error**: "File size exceeds the maximum limit of 200MB"
+- **Cause**: The uploaded file is larger than 200MB
+- **Solutions**:
+  - Compress or resize the image before uploading
+  - Split large images into smaller files
+  - Use image editing software to reduce file size
+  - The 200MB limit helps prevent resource exhaustion and ensures smooth operation
+
 ### Platform-Specific Issues
 
 **Windows**:
@@ -332,6 +344,7 @@ The `imgconvrtr.py` module uses Python's `ctypes` library to directly call libwe
 - **Memory Usage**: Large images may require significant RAM
 - **Quality vs Size**: Lower quality = smaller files but more compression artifacts
 - **Lossless**: Larger files but perfect quality preservation
+- **File Size Limit**: Maximum 200MB per file to prevent resource exhaustion and ensure system stability
 
 ## 🤝 Contributing
 
